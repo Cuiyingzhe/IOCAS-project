@@ -1,0 +1,73 @@
+clc;clear;
+load G:\科创计划数据\data_blur.mat
+[m,n,i,g,k]=size(data_blur);%得到数据大小
+data0=data_blur(:,:,:,7,1);%1月份表层温度数据
+data1=data_blur(:,:,:,7,2);%1月份表层盐度数据
+data2=999.842594+6.793952e-2*data0-9.095290e-3*data0.^2+1.001685e-4*data0.^3....
+-1.120083e-6*data0.^4+6.536332e-9*data0.^5+(8.24493e-1-4.0899e-3*data0+...
+7.6438e-5*data0.^2-8.2467e-7*data0.^3+5.3875e-9*data0.^4).*data1...
+    +(-5.72466e-3+1.0227e-4*data0-1.6546e-6*data0.^2).*data1.^1.5+4.8314e-4...
+    *data1.^2;%data2为密度
+data3=1./data2;%data3为比容
+h=[0:5:100,125:25:500,550:50:2000];%深度
+h_=zeros(i-1,1);
+soh=i;
+for i=1:soh-1
+    h_(i,1)=h(i+1)-h(i);
+end%得到深度间隔
+p_=h_*10e3;
+datax=zeros(m,n,soh-1);datay=zeros(m,n,soh-1);
+%以下为分段求比容对压强的积分
+for z=37:soh-1
+  for i=1:m
+    for j=1:n
+        if i==1
+            datax(i,j,z)=(data3(i+1,j,z+1)+data3(i+1,j,z)-data3(i,j,z)-data3...
+                (i,j,z+1))*p_(z)/2;
+        elseif i==m
+                datax(i,j,z)=(data3(i,j,z+1)+data3(i,j,z)-data3(i-1,j,z+1)...
+                -data3(i-1,j,z))*p_(z)/2;
+        elseif j==1
+            datay(i,j,z)=(data3(i,j+1,z+1)+data3(i,j+1,z)-data3(i,j,z+1)-...
+                data3(i,j,z))*p_(z)/2;
+        elseif j==n
+            datay(i,j,z)=(data3(i,j,z+1)+data3(i,j,z)-data3(i,j-1,z+1)-...
+            data3(i,j-1,z))*p_(z)/2;%以上四种为边界
+        else
+            datax(i,j,z)=(data3(i+1,j,z+1)+data3(i+1,j,z)-data3(i-1,j,z)-...
+                data3(i-1,j,z+1))*p_(z)/2;
+            datay(i,j,z)=(data3(i,j+1,z+1)+data3(i,j+1,z)-data3(i,j-1,z+1)-...
+                data3(i,j-1,z))*p_(z)/2;%正常情况
+        end
+    end
+  end
+end
+w=7.27e-5;L1=1.117e5/8;
+A=zeros(m,n);%A表示纬度值
+for i=1:m
+    A(i,:)=-10+1/8*(i-1);
+end
+L2=1.117e5*cos(A*pi/180)/8;%L1为经向间隔，L2为纬向间隔
+dataCx=2*w*L1*sin(A*pi/180);
+dataCy=2*w*L2.*sin(A*pi/180);%两个参数
+datax_=reshape(sum(datax,3),m,n);datay_=reshape(sum(datay,3),m,n);%变积分为累加
+vx=datax_./dataCx;vy=datay_./dataCy;
+v=sqrt(vx.^2+vy.^2);
+
+%画图部分
+vx_1=vx;vx_1(82:401,:)=-vx(82:401,:);
+vy_1=vy;vy_1(1:80,:)=-vy(1:80,:);%调整方向，向北向东为正方向
+vx_1(41:120,:)=0;vy_1(41:120,:)=0;%令赤道南北5度以内为0
+x=115:1/8:180;y=-10:1/8:40;
+[lon,lat]=meshgrid(x,y);
+m_proj('Miller Cylindrical','lon',[115,180],'lat',[-10,40]);
+m_coast;
+m_grid('tickdir','in');%画出平面地图
+hold on
+m_quiver(lon(1:8:401,1:8:521),lat(1:8:401,1:8:521),vx_1(1:8:401,1:8:521)*5,...
+    vy_1(1:8:401,1:8:521)*5,0,'k');%画出矢量图
+m_coast('patch',[1 1 1],'edgecolor','k');%填充陆地为白色
+title('7月500m（*5，动力高度法）')
+
+             
+            
